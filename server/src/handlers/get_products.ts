@@ -1,63 +1,33 @@
 
+import { db } from '../db';
+import { productsTable } from '../db/schema';
 import { type GetProductsInput, type Product } from '../schema';
+import { eq, desc } from 'drizzle-orm';
 
-export async function getProducts(input: GetProductsInput): Promise<Product[]> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is to fetch products with pagination and optional status filtering
-    // Supports filtering by product status (promo, baru, regular)
+export const getProducts = async (input: GetProductsInput): Promise<Product[]> => {
+  try {
+    // Build the query step by step without reassigning
+    const baseQuery = db.select().from(productsTable);
     
-    const mockProducts: Product[] = [
-        {
-            id: 1,
-            name: "TV LED 55\"",
-            price: 5999000,
-            status: 'promo',
-            image_url: null,
-            description: "Smart TV LED 55 inch dengan resolusi 4K",
-            created_at: new Date(),
-            updated_at: new Date()
-        },
-        {
-            id: 2,
-            name: "Kulkas 2 Pintu",
-            price: 6750000,
-            status: 'baru',
-            image_url: null,
-            description: "Kulkas 2 pintu dengan freezer besar",
-            created_at: new Date(),
-            updated_at: new Date()
-        },
-        {
-            id: 3,
-            name: "Sofa 3 Dudukan",
-            price: 4500000,
-            status: 'promo',
-            image_url: null,
-            description: "Sofa nyaman untuk ruang tamu",
-            created_at: new Date(),
-            updated_at: new Date()
-        },
-        {
-            id: 4,
-            name: "Mesin Cuci 8kg",
-            price: 3200000,
-            status: 'regular',
-            image_url: null,
-            description: "Mesin cuci otomatis kapasitas 8kg",
-            created_at: new Date(),
-            updated_at: new Date()
-        }
-    ];
+    // Apply filters and build final query
+    const finalQuery = input.status 
+      ? baseQuery.where(eq(productsTable.status, input.status))
+        .orderBy(desc(productsTable.created_at))
+        .limit(input.limit)
+        .offset(input.offset)
+      : baseQuery.orderBy(desc(productsTable.created_at))
+        .limit(input.limit)
+        .offset(input.offset);
 
-    // Apply status filter if provided
-    let filteredProducts = mockProducts;
-    if (input.status) {
-        filteredProducts = mockProducts.filter(product => product.status === input.status);
-    }
+    const results = await finalQuery.execute();
 
-    // Apply pagination
-    const startIndex = input.offset || 0;
-    const endIndex = startIndex + (input.limit || 10);
-    
-    return Promise.resolve(filteredProducts.slice(startIndex, endIndex));
-}
+    // Convert numeric fields back to numbers
+    return results.map(product => ({
+      ...product,
+      price: parseFloat(product.price)
+    }));
+  } catch (error) {
+    console.error('Get products failed:', error);
+    throw error;
+  }
+};

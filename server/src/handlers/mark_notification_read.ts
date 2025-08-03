@@ -1,17 +1,28 @@
 
+import { db } from '../db';
+import { notificationsTable } from '../db/schema';
 import { type MarkNotificationReadInput } from '../schema';
+import { eq, and } from 'drizzle-orm';
 
 export async function markNotificationRead(input: MarkNotificationReadInput): Promise<{ success: boolean }> {
-    // This is a placeholder declaration! Real code should be implemented here.  
-    // The goal of this handler is to mark a specific notification as read for a member
-    // Should verify that the notification belongs to the specified member before updating
-    
-    console.log(`Marking notification ${input.notificationId} as read for member ${input.memberId}`);
-    
-    // In real implementation, this would:
-    // 1. Verify the notification exists and belongs to the member
-    // 2. Update the is_read field to true
-    // 3. Return success status
-    
-    return Promise.resolve({ success: true });
+  try {
+    // Update notification to mark as read, but only if it belongs to the specified member
+    const result = await db.update(notificationsTable)
+      .set({ is_read: true })
+      .where(
+        and(
+          eq(notificationsTable.id, input.notificationId),
+          eq(notificationsTable.member_id, input.memberId)
+        )
+      )
+      .returning()
+      .execute();
+
+    // If no rows were affected, the notification either doesn't exist 
+    // or doesn't belong to the specified member
+    return { success: result.length > 0 };
+  } catch (error) {
+    console.error('Mark notification read failed:', error);
+    throw error;
+  }
 }
